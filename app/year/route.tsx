@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import type { CSSProperties } from "react";
-// test push 1
+
 export const runtime = "edge";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -9,6 +9,10 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 function monFirstIndex(utcDay: number) {
   // JS: getUTCDay(): 0=Dom ... 6=Sáb  -> queremos 0=Lun ... 6=Dom
   return (utcDay + 6) % 7;
+}
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
 }
 
 function daysInMonthUTC(year: number, month0: number) {
@@ -47,6 +51,17 @@ export async function GET(req: Request) {
   const pct = Math.round(progress * 100);
 
   // =========================
+  // Cumples (MM-DD)
+  // =========================
+  const BIRTHDAYS = new Set<string>([
+    "05-01",
+    "03-28",
+    "10-08",
+    "11-08",
+    "11-24",
+  ]);
+
+  // =========================
   // LAYOUT (márgenes grandes)
   // =========================
   const topMargin = Math.round(height * 0.30); // aire arriba
@@ -64,6 +79,7 @@ export async function GET(req: Request) {
   // Dots para 7 columnas
   const dotGap = Math.max(10, Math.round(monthW * 0.06));
   const dot = Math.max(10, Math.floor((monthW - dotGap * 6) / 7));
+  const ring = Math.max(3, Math.round(dot * 0.22)); // grosor del anillo cumple
 
   const labelFont = Math.max(18, Math.round(dot * 1.25));
   const labelH = Math.round(dot * 2.0);
@@ -76,8 +92,8 @@ export async function GET(req: Request) {
   const footerFont = Math.max(22, Math.round(width * 0.04));
 
   // Barra fina
-  const barH = Math.max(6, Math.round(width * 0.008)); // finita
-  const barGap = Math.max(8, Math.round(barH * 1.2));  // separación texto->barra
+  const barH = Math.max(6, Math.round(width * 0.008));
+  const barGap = Math.max(8, Math.round(barH * 1.2));
 
   // =========================
   // COLORES (modo oscuro)
@@ -91,14 +107,17 @@ export async function GET(req: Request) {
   const pastWeekday = "#e9e9ea";
   const futureWeekday = "#2f2f31";
 
-  // Fin de semana:
-  // Sábado: gris más clarito para que destaque
+  // Sábado: gris clarito que resalta
   const pastSaturday = "#cfcfd1";
   const futureSaturday = "#6b6b70";
 
   // Domingo: rojo
-  const sundayRedPast = "#ff3b30";
-  const sundayRedFuture = "#ff3b30";
+  const sundayRed = "#ff3b30";
+  // Para que el anillo rojo de cumple se note si justo cae en domingo:
+  const sundayRedInnerWhenBirthday = "#b3261e"; // rojo más oscuro para el interior
+
+  // Cumples: anillo rojo por fuera
+  const birthdayRing = "#ff3b30";
 
   // Barra: carril oscuro + relleno naranja
   const barTrack = "#1b1b1d";
@@ -149,7 +168,7 @@ export async function GET(req: Request) {
               const dim = daysInMonthUTC(year, month0);
 
               const total = startOffset + dim;
-              const paddedTotal = Math.ceil(total / 7) * 7; // semanas completas
+              const paddedTotal = Math.ceil(total / 7) * 7;
 
               return (
                 <div
@@ -218,10 +237,14 @@ export async function GET(req: Request) {
                       const isToday = dayDate.getTime() === todayMidnight.getTime();
                       const isPast = dayDate.getTime() < todayMidnight.getTime();
 
+                      const mmdd = `${pad2(month0 + 1)}-${pad2(dayNum)}`;
+                      const isBirthday = BIRTHDAYS.has(mmdd);
+
                       let fillBase: string;
 
                       if (isSunday) {
-                        fillBase = isPast ? sundayRedPast : sundayRedFuture;
+                        // Domingo rojo, pero si es cumple, oscurecemos el interior para que el anillo rojo se vea
+                        fillBase = isBirthday ? sundayRedInnerWhenBirthday : sundayRed;
                       } else if (isSaturday) {
                         fillBase = isPast ? pastSaturday : futureSaturday;
                       } else {
@@ -242,6 +265,11 @@ export async function GET(req: Request) {
                         dotStyle = { ...dotStyle, background: accent };
                       }
 
+                      // Cumple: anillo rojo por fuera
+                      if (isBirthday) {
+                        dotStyle = { ...dotStyle, border: `${ring}px solid ${birthdayRing}` };
+                      }
+
                       return <div key={idx} style={dotStyle} />;
                     })}
                   </div>
@@ -253,7 +281,7 @@ export async function GET(req: Request) {
           {/* Footer spacing (pegado) */}
           <div style={{ display: "flex", height: footerGap }} />
 
-          {/* Footer: días + % (juntos) */}
+          {/* Footer: días + % */}
           <div
             style={{
               display: "flex",
@@ -270,7 +298,7 @@ export async function GET(req: Request) {
             <div style={{ display: "flex", color: subtle }}>{pct}%</div>
           </div>
 
-          {/* Barra de progreso fina (pegada al texto) */}
+          {/* Barra de progreso fina */}
           <div style={{ display: "flex", height: barGap }} />
 
           <div
