@@ -28,9 +28,9 @@ function dayOfYearUTC(d: Date) {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
-  // iPhone 15 Pro Max recomendado
-  const width = parseInt(searchParams.get("width") ?? "1290", 10);
-  const height = parseInt(searchParams.get("height") ?? "2796", 10);
+  // Defaults: tu tamaño (vertical)
+  const width = parseInt(searchParams.get("width") ?? "1179", 10);
+  const height = parseInt(searchParams.get("height") ?? "2556", 10);
 
   // Pásalo desde Atajos como YYYY-MM-DD para refresco diario
   const dateParam = searchParams.get("date"); // "YYYY-MM-DD"
@@ -51,7 +51,7 @@ export async function GET(req: Request) {
   const topMargin = Math.round(height * 0.30); // aire arriba
   const bottomMargin = Math.round(height * 0.22); // aire abajo
 
-  const contentW = Math.round(width * 0.72); // bloque más estrecho (como el ejemplo)
+  const contentW = Math.round(width * 0.72); // bloque más estrecho
   const leftRight = Math.round((width - contentW) / 2);
 
   const colGap = Math.round(width * 0.06);
@@ -70,8 +70,9 @@ export async function GET(req: Request) {
   const dotsH = 6 * dot + 5 * dotGap; // 6 filas máx
   const monthH = labelH + dotsH;
 
-  // Footer
-  const footerGap = Math.round(height * 0.06);
+  // Footer (pegado al calendario)
+  // Antes era height*0.06; ahora lo hacemos MUY pequeño (casi pegado).
+  const footerGap = Math.max(6, Math.round(dot * 0.45));
   const footerFont = Math.max(22, Math.round(width * 0.04));
 
   // =========================
@@ -87,9 +88,7 @@ export async function GET(req: Request) {
   const futureWeekday = "#2f2f31";
 
   // FINES DE SEMANA
-  // Sábado: MÁS clarito para que destaque
-  // - En pasado: un gris clarito (diferente del blanco de laborables)
-  // - En futuro: un gris claro (destaca sobre el gris oscuro de laborables futuros)
+  // Sábado: gris más clarito (destaca)
   const pastSaturday = "#cfcfd1";
   const futureSaturday = "#6b6b70";
 
@@ -212,7 +211,6 @@ export async function GET(req: Request) {
                       const isToday = dayDate.getTime() === todayMidnight.getTime();
                       const isPast = dayDate.getTime() < todayMidnight.getTime();
 
-                      // Color base según tipo de día
                       let fillBase: string;
 
                       if (isSunday) {
@@ -223,7 +221,6 @@ export async function GET(req: Request) {
                         fillBase = isPast ? pastWeekday : futureWeekday;
                       }
 
-                      // Bolita
                       let dotStyle: CSSProperties = {
                         display: "flex",
                         width: dot,
@@ -246,7 +243,7 @@ export async function GET(req: Request) {
             })}
           </div>
 
-          {/* Footer spacing */}
+          {/* Footer spacing (MUY pequeño, pegado) */}
           <div style={{ display: "flex", height: footerGap }} />
 
           {/* Footer: 355d left · 2% */}
