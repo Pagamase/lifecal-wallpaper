@@ -39,11 +39,12 @@ export async function GET(req: Request) {
   const year = today.getUTCFullYear();
   const todayMidnight = new Date(Date.UTC(year, today.getUTCMonth(), today.getUTCDate()));
 
-  // Footer: “xd left · %”
+  // Progreso anual
   const totalDays = isLeapYear(year) ? 366 : 365;
-  const doy = dayOfYearUTC(today);
+  const doy = dayOfYearUTC(today); // 1..365/366
   const daysLeft = totalDays - doy;
-  const pct = Math.round((doy / totalDays) * 100);
+  const progress = Math.min(1, Math.max(0, doy / totalDays));
+  const pct = Math.round(progress * 100);
 
   // =========================
   // LAYOUT (márgenes grandes)
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
   const topMargin = Math.round(height * 0.30); // aire arriba
   const bottomMargin = Math.round(height * 0.22); // aire abajo
 
-  const contentW = Math.round(width * 0.72); // bloque más estrecho
+  const contentW = Math.round(width * 0.72); // bloque más estrecho (como el ejemplo)
   const leftRight = Math.round((width - contentW) / 2);
 
   const colGap = Math.round(width * 0.06);
@@ -71,9 +72,12 @@ export async function GET(req: Request) {
   const monthH = labelH + dotsH;
 
   // Footer (pegado al calendario)
-  // Antes era height*0.06; ahora lo hacemos MUY pequeño (casi pegado).
   const footerGap = Math.max(6, Math.round(dot * 0.45));
   const footerFont = Math.max(22, Math.round(width * 0.04));
+
+  // Barra fina
+  const barH = Math.max(6, Math.round(width * 0.008)); // finita
+  const barGap = Math.max(8, Math.round(barH * 1.2));  // separación texto->barra
 
   // =========================
   // COLORES (modo oscuro)
@@ -87,14 +91,17 @@ export async function GET(req: Request) {
   const pastWeekday = "#e9e9ea";
   const futureWeekday = "#2f2f31";
 
-  // FINES DE SEMANA
-  // Sábado: gris más clarito (destaca)
+  // Fin de semana:
+  // Sábado: gris más clarito para que destaque
   const pastSaturday = "#cfcfd1";
   const futureSaturday = "#6b6b70";
 
   // Domingo: rojo
   const sundayRedPast = "#ff3b30";
   const sundayRedFuture = "#ff3b30";
+
+  // Barra: carril oscuro + relleno naranja
+  const barTrack = "#1b1b1d";
 
   return new ImageResponse(
     (
@@ -243,25 +250,49 @@ export async function GET(req: Request) {
             })}
           </div>
 
-          {/* Footer spacing (MUY pequeño, pegado) */}
+          {/* Footer spacing (pegado) */}
           <div style={{ display: "flex", height: footerGap }} />
 
-          {/* Footer: 355d left · 2% */}
+          {/* Footer: días + % (juntos) */}
           <div
             style={{
               display: "flex",
               flexDirection: "row",
-              justifyContent: "center",
+              justifyContent: "space-between",
               alignItems: "center",
-              gap: Math.max(10, Math.round(footerFont * 0.4)),
+              width: contentW,
               fontSize: footerFont,
               fontWeight: 700,
               letterSpacing: 0.2,
             }}
           >
             <div style={{ display: "flex", color: accent }}>{daysLeft}d left</div>
-            <div style={{ display: "flex", color: subtle }}>·</div>
             <div style={{ display: "flex", color: subtle }}>{pct}%</div>
+          </div>
+
+          {/* Barra de progreso fina (pegada al texto) */}
+          <div style={{ display: "flex", height: barGap }} />
+
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              width: contentW,
+              height: barH,
+              background: barTrack,
+              borderRadius: 999,
+              boxSizing: "border-box",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                width: `${Math.round(progress * 1000) / 10}%`,
+                height: "100%",
+                background: accent,
+              }}
+            />
           </div>
         </div>
 
