@@ -1,0 +1,28 @@
+﻿{
+    "pastDay":  "#e9e9ea",
+    "barTrack":  "#1b1b1d",
+    "sundayRed":  "#ff3b30",
+    "sundayRedInnerWhenBirthday":  "#b3261e",
+    "rowGapPct":  0.055,
+    "colGapPct":  0.06,
+    "futureSaturday":  "#6b6b70",
+    "subtle":  "#7c7c7d",
+    "label":  "#a9a9aa",
+    "futureDay":  "#2f2f31",
+    "bg":  "#0f0f10",
+    "birthdays":  [
+                      "05-01",
+                      "03-28",
+                      "10-08",
+                      "11-08",
+                      "11-24"
+                  ],
+    "topMarginPct":  0.225,
+    "accent":  "#ff7a00",
+    "todayHalo":  "#f2f2f2",
+    "bottomMarginPct":  0.22,
+    "sundayRingColor":  "#f2f2f2",
+    "showSundayRing":  false,
+    "birthdayRing":  "#ff3b30",
+    "contentWidthPct":  0.72
+}
