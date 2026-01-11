@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 
 export const runtime = "edge";
 
+// Estilo como el ejemplo (abreviaturas en inglés)
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // Semana Lunes->Domingo
@@ -32,42 +33,39 @@ function dayOfYearUTC(d: Date) {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
-  // Defaults: tu tamaño (vertical)
-  const width = parseInt(searchParams.get("width") ?? "1179", 10);
-  const height = parseInt(searchParams.get("height") ?? "2556", 10);
+  // iPhone 15 Pro Max recomendado
+  const width = parseInt(searchParams.get("width") ?? "1290", 10);
+  const height = parseInt(searchParams.get("height") ?? "2796", 10);
 
-  // Fecha desde Atajos (YYYY-MM-DD)
-  const dateParam = searchParams.get("date");
+  // Pásalo desde Atajos como YYYY-MM-DD para refresco diario
+  const dateParam = searchParams.get("date"); // "YYYY-MM-DD"
   const today = dateParam ? new Date(`${dateParam}T00:00:00Z`) : new Date();
-
   const year = today.getUTCFullYear();
+
+  // Cumples (MM-DD). Por defecto: 03-28 y 11-24
+  const bParam = searchParams.get("b") ?? "03-28,11-24";
+  const birthdays = new Set(
+    bParam
+      .split(",")
+      .map((s) => (s ?? "").trim())
+      .filter(Boolean)
+  );
+
   const todayMidnight = new Date(Date.UTC(year, today.getUTCMonth(), today.getUTCDate()));
 
-  // Progreso anual
+  // Footer: “xd left · %”
   const totalDays = isLeapYear(year) ? 366 : 365;
   const doy = dayOfYearUTC(today);
   const daysLeft = totalDays - doy;
-  const progress = Math.min(1, Math.max(0, doy / totalDays));
-  const pct = Math.round(progress * 100);
-
-  // =========================
-  // Cumples (MM-DD) -> anillo rojo
-  // =========================
-  const BIRTHDAYS = new Set<string>([
-    "05-01",
-    "03-28",
-    "10-08",
-    "11-08",
-    "11-24",
-  ]);
+  const pct = Math.round((doy / totalDays) * 100);
 
   // =========================
   // LAYOUT (márgenes grandes)
   // =========================
-  const topMargin = Math.round(height * 0.30);
-  const bottomMargin = Math.round(height * 0.22);
+  const topMargin = Math.round(height * 0.30); // aire arriba
+  const bottomMargin = Math.round(height * 0.22); // aire abajo
 
-  const contentW = Math.round(width * 0.72);
+  const contentW = Math.round(width * 0.72); // bloque más estrecho (como el ejemplo)
   const leftRight = Math.round((width - contentW) / 2);
 
   const colGap = Math.round(width * 0.06);
@@ -76,48 +74,41 @@ export async function GET(req: Request) {
   const cols = 3;
   const monthW = Math.floor((contentW - colGap * (cols - 1)) / cols);
 
+  // Dots calculados para que quepan 7 columnas
   const dotGap = Math.max(10, Math.round(monthW * 0.06));
-  const dot = Math.max(10, Math.floor((monthW - dotGap * 6) / 7));
-  const ring = Math.max(3, Math.round(dot * 0.22)); // grosor anillo cumple
-  const todayPad = Math.max(2, Math.round(dot * 0.16)); // grosor del anillo claro de HOY
+  const dot = Math.max(10, Math.floor((monthW - dotGap * 6) / 7)); // tamaño bolita
+  const ring = Math.max(3, Math.round(dot * 0.20)); // grosor anillo
 
   const labelFont = Math.max(18, Math.round(dot * 1.25));
   const labelH = Math.round(dot * 2.0);
 
+  // 6 filas máximo por mes
   const dotsH = 6 * dot + 5 * dotGap;
   const monthH = labelH + dotsH;
 
-  const footerGap = Math.max(6, Math.round(dot * 0.45));
+  // Footer
+  const footerGap = Math.round(height * 0.06);
   const footerFont = Math.max(22, Math.round(width * 0.04));
 
-  const barH = Math.max(6, Math.round(width * 0.008));
-  const barGap = Math.max(8, Math.round(barH * 1.2));
-
   // =========================
-  // COLORES
+  // COLORES (modo oscuro)
   // =========================
   const bg = "#0f0f10";
   const label = "#a9a9aa";
   const subtle = "#7c7c7d";
-  const accent = "#ff7a00"; // HOY
+  const accent = "#ff7a00";
+  const red = "#ff3b30"; // rojo iOS
 
+  // Diferenciar findes:
   const pastWeekday = "#e9e9ea";
+  const pastWeekend = "#d2d2d3";
+
   const futureWeekday = "#2f2f31";
+  const futureWeekend = "#3a3a3c";
 
-  const pastSaturday = "#cfcfd1";
-  const futureSaturday = "#6b6b70";
-
-  const sundayRed = "#ff3b30";
-  // Si es domingo y cumple, oscurecemos el interior para que el anillo rojo se vea
-  const sundayRedInnerWhenBirthday = "#b3261e";
-
-  const birthdayRing = "#ff3b30"; // anillo cumples
-
-  // Anillo claro para HOY (para diferenciar de domingo rojo)
-  const todayHalo = "#f2f2f2";
-
-  const barTrack = "#1b1b1d";
-
+  // =========================
+  // RENDER
+  // =========================
   return new ImageResponse(
     (
       <div
@@ -130,8 +121,10 @@ export async function GET(req: Request) {
           boxSizing: "border-box",
         }}
       >
+        {/* Top margin */}
         <div style={{ display: "flex", height: topMargin }} />
 
+        {/* Content block */}
         <div
           style={{
             display: "flex",
@@ -175,6 +168,7 @@ export async function GET(req: Request) {
                     boxSizing: "border-box",
                   }}
                 >
+                  {/* Month label */}
                   <div
                     style={{
                       height: labelH,
@@ -191,6 +185,7 @@ export async function GET(req: Request) {
                     {mName}
                   </div>
 
+                  {/* Dots */}
                   <div
                     style={{
                       display: "flex",
@@ -206,6 +201,7 @@ export async function GET(req: Request) {
                       const dayNum = idx - startOffset + 1;
                       const inMonth = dayNum >= 1 && dayNum <= dim;
 
+                      // Huecos invisibles
                       if (!inMonth) {
                         return (
                           <div
@@ -222,60 +218,28 @@ export async function GET(req: Request) {
 
                       // 0=Lun..6=Dom
                       const weekdayIndex = (startOffset + (dayNum - 1)) % 7;
-                      const isSaturday = weekdayIndex === 5;
-                      const isSunday = weekdayIndex === 6;
+                      const isWeekend = weekdayIndex === 5 || weekdayIndex === 6;
+
+                      const mmdd = `${pad2(month0 + 1)}-${pad2(dayNum)}`;
+                      const isBday = birthdays.has(mmdd);
 
                       const dayDate = new Date(Date.UTC(year, month0, dayNum));
                       const isToday = dayDate.getTime() === todayMidnight.getTime();
                       const isPast = dayDate.getTime() < todayMidnight.getTime();
 
-                      const mmdd = `${pad2(month0 + 1)}-${pad2(dayNum)}`;
-                      const isBirthday = BIRTHDAYS.has(mmdd);
+                      // Regla 19:
+                      const isNineteenth = dayNum === 19;
+                      const isFeb19 = isNineteenth && month0 === 1; // Febrero = 1 (0-index)
 
-                      let fillBase: string;
+                      const fillBase = isPast
+                        ? isWeekend
+                          ? pastWeekend
+                          : pastWeekday
+                        : isWeekend
+                        ? futureWeekend
+                        : futureWeekday;
 
-                      if (isSunday) {
-                        fillBase = isBirthday ? sundayRedInnerWhenBirthday : sundayRed;
-                      } else if (isSaturday) {
-                        fillBase = isPast ? pastSaturday : futureSaturday;
-                      } else {
-                        fillBase = isPast ? pastWeekday : futureWeekday;
-                      }
-
-                      // --- HOY: naranja con anillo claro (para que destaque sobre domingo rojo) ---
-                      if (isToday) {
-                        const outerStyle: CSSProperties = {
-                          display: "flex",
-                          width: dot,
-                          height: dot,
-                          borderRadius: 999,
-                          boxSizing: "border-box",
-                          background: todayHalo,
-                          padding: todayPad,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        };
-
-                        if (isBirthday) {
-                          outerStyle.border = `${ring}px solid ${birthdayRing}`;
-                        }
-
-                        const innerStyle: CSSProperties = {
-                          display: "flex",
-                          width: "100%",
-                          height: "100%",
-                          borderRadius: 999,
-                          background: accent,
-                        };
-
-                        return (
-                          <div key={idx} style={outerStyle}>
-                            <div style={innerStyle} />
-                          </div>
-                        );
-                      }
-
-                      // --- NO hoy: bolita normal (+ anillo rojo si cumple) ---
+                      // Base: bolita normal (sin border)
                       let dotStyle: CSSProperties = {
                         display: "flex",
                         width: dot,
@@ -285,8 +249,24 @@ export async function GET(req: Request) {
                         boxSizing: "border-box",
                       };
 
-                      if (isBirthday) {
-                        dotStyle = { ...dotStyle, border: `${ring}px solid ${birthdayRing}` };
+                      // Hoy: naranja (pero si es Feb19, gana el rojo)
+                      if (isToday) {
+                        dotStyle = { ...dotStyle, background: accent };
+                      }
+
+                      // 19 de Febrero: círculo rojo relleno (prioridad máxima)
+                      if (isFeb19) {
+                        dotStyle = { ...dotStyle, background: red };
+                      } else {
+                        // Todos los 19: anillo rojo alrededor
+                        if (isNineteenth) {
+                          dotStyle = { ...dotStyle, border: `${ring}px solid ${red}` };
+                        }
+                      }
+
+                      // Cumple: anillo naranja (solo si NO es día 19; así respetamos tu regla del 19)
+                      if (isBday && !isNineteenth && !isFeb19) {
+                        dotStyle = { ...dotStyle, border: `${ring}px solid ${accent}` };
                       }
 
                       return <div key={idx} style={dotStyle} />;
@@ -297,58 +277,38 @@ export async function GET(req: Request) {
             })}
           </div>
 
+          {/* Footer spacing */}
           <div style={{ display: "flex", height: footerGap }} />
 
-          {/* Footer: days left + % */}
+          {/* Footer: 355d left · 2% */}
           <div
             style={{
               display: "flex",
               flexDirection: "row",
-              justifyContent: "space-between",
+              justifyContent: "center",
               alignItems: "center",
-              width: contentW,
+              gap: Math.max(10, Math.round(footerFont * 0.4)),
               fontSize: footerFont,
               fontWeight: 700,
               letterSpacing: 0.2,
             }}
           >
             <div style={{ display: "flex", color: accent }}>{daysLeft}d left</div>
+            <div style={{ display: "flex", color: subtle }}>·</div>
             <div style={{ display: "flex", color: subtle }}>{pct}%</div>
-          </div>
-
-          <div style={{ display: "flex", height: barGap }} />
-
-          {/* Barra */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              width: contentW,
-              height: barH,
-              background: barTrack,
-              borderRadius: 999,
-              boxSizing: "border-box",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                width: `${Math.round(progress * 1000) / 10}%`,
-                height: "100%",
-                background: accent,
-              }}
-            />
           </div>
         </div>
 
+        {/* Bottom margin */}
         <div style={{ display: "flex", height: bottomMargin }} />
       </div>
     ),
     {
       width,
       height,
-      headers: { "Cache-Control": "no-store" },
+      headers: {
+        "Cache-Control": "no-store",
+      },
     }
   );
 }
