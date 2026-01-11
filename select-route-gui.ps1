@@ -1,9 +1,11 @@
 $ErrorActionPreference = 'Stop'
 
-# Texto en espanol SIN tildes/enye para evitar problemas de codificacion en PowerShell/Windows.
-# v10 FIX:
-# Tu PowerShell no soporta ConvertFrom-Json -AsHashtable (tipico en PowerShell 5.1).
-# Implementamos una conversion a hashtable compatible.
+# LifeCal Selector GUI (v12)
+# FIX IMPORTANTE:
+# En PowerShell, $args es una variable automatica (array) y se "come" el parametro si lo llamas igual.
+# En v11, Run-Git tenia parametro [string]$args -> dentro de la funcion, $args podia ser el automatico => git se lanzaba SIN argumentos.
+# Resultado: 'usage: git ...' (exactamente lo que has visto).
+# Ahora usamos $gitArgs para evitar la colision.
 
 function Get-RepoRoot() {
   if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) { return $PSScriptRoot }
@@ -49,26 +51,19 @@ function Reset-Logs() {
 
 function To-Hashtable($obj) {
   if ($null -eq $obj) { return $null }
-
-  # Ya es diccionario/hashtable
   if ($obj -is [System.Collections.IDictionary]) { return $obj }
 
-  # Arrays/Listas (pero no string)
   if (($obj -is [System.Collections.IEnumerable]) -and -not ($obj -is [string])) {
     $arr = @()
     foreach ($item in $obj) { $arr += (To-Hashtable $item) }
     return $arr
   }
 
-  # PSCustomObject / PSObject -> hashtable
   if ($obj -is [psobject]) {
     $ht = @{}
-    foreach ($p in $obj.PSObject.Properties) {
-      $ht[$p.Name] = (To-Hashtable $p.Value)
-    }
+    foreach ($p in $obj.PSObject.Properties) { $ht[$p.Name] = (To-Hashtable $p.Value) }
     return $ht
   }
-
   return $obj
 }
 
@@ -104,9 +99,7 @@ function Try-ParseInlineDesc([string]$tsxPath) {
     if ($lines.Count -eq 0) { return $null }
 
     $descLines = @()
-    foreach ($l in $lines) {
-      if ($l -match '^\s*//\s*DESC\s*:\s*(.*)$') { $descLines += $Matches[1] }
-    }
+    foreach ($l in $lines) { if ($l -match '^\s*//\s*DESC\s*:\s*(.*)$') { $descLines += $Matches[1] } }
     if ($descLines.Count -gt 0) { return ($descLines -join "`r`n").Trim() }
 
     $text = ($lines -join "`n")
@@ -120,10 +113,51 @@ function Try-ParseInlineDesc([string]$tsxPath) {
   } catch { return $null }
 }
 
-function Run-Git([string]$repo, [string]$args) {
+function Find-GitExe() {
+  $cmd = Get-Command git -ErrorAction SilentlyContinue
+  if ($cmd -and $cmd.Source) { return $cmd.Source }
+
+  $candidates = @(
+    "$env:ProgramFiles\Git\cmd\git.exe",
+    "$env:ProgramFiles\Git\bin\git.exe",
+    "$env:ProgramFiles(x86)\Git\cmd\git.exe",
+    "$env:ProgramFiles(x86)\Git\bin\git.exe",
+    "$env:LocalAppData\Programs\Git\cmd\git.exe",
+    "$env:LocalAppData\Programs\Git\bin\git.exe"
+  )
+  foreach ($c in $candidates) {
+    if (-not [string]::IsNullOrWhiteSpace($c) -and (Test-Path $c)) { return $c }
+  }
+  return $null
+}
+
+function Explain-GitError([string]$stderr, [string]$repo, [string]$stdout) {
+  if ($stdout -match '^usage:\s+git\s') {
+    return "Git se ha lanzado SIN comandos (o con argumentos mal parseados). Con v12 esto queda arreglado."
+  }
+
+  if ([string]::IsNullOrWhiteSpace($stderr)) { return "No hay detalles en stderr." }
+
+  if ($stderr -match 'not a git repository') {
+    return "Parece que NO estas dentro de un repo git. Ejecuta la GUI desde la raiz donde exista la carpeta .git:`r`n$repo"
+  }
+  if ($stderr -match 'dubious ownership') {
+    return "Git esta bloqueando el repo por 'dubious ownership'. Solucion (PowerShell):`r`n" +
+           "git config --global --add safe.directory `"$repo`""
+  }
+  if ($stderr -match 'index\.lock') {
+    return "Hay un lock de git (index.lock). Cierra otras apps que usen git y borra:`r`n$repo\.git\index.lock"
+  }
+  if ($stderr -match 'Permission denied' -or $stderr -match 'Access is denied') {
+    return "Permisos/antivirus. Prueba ejecutar la GUI normal (no admin) y revisa Windows Defender 'Controlled folder access'."
+  }
+  return "Error git (sin clasificar)."
+}
+
+function Run-Git([string]$gitExe, [string]$repo, [string]$gitArgs) {
   $psi = New-Object System.Diagnostics.ProcessStartInfo
-  $psi.FileName = 'git'
-  $psi.Arguments = $args
+  $psi.FileName = $gitExe
+  $psi.Arguments = $gitArgs
   $psi.WorkingDirectory = $repo
   $psi.RedirectStandardOutput = $true
   $psi.RedirectStandardError = $true
@@ -132,12 +166,13 @@ function Run-Git([string]$repo, [string]$args) {
 
   $p = New-Object System.Diagnostics.Process
   $p.StartInfo = $psi
+
   [void]$p.Start()
   $out = $p.StandardOutput.ReadToEnd()
   $err = $p.StandardError.ReadToEnd()
   $p.WaitForExit()
 
-  return @{ ExitCode = $p.ExitCode; Stdout = $out; Stderr = $err }
+  return @{ ExitCode = $p.ExitCode; Stdout = $out; Stderr = $err; GitArgs = $gitArgs; Git = $gitExe }
 }
 
 function Prompt-Multiline([string]$title, [string]$labelText, [string]$initial) {
@@ -235,13 +270,26 @@ function Prompt-OneLine([string]$title, [string]$labelText, [string]$initial) {
 
 try {
   Reset-Logs | Out-Null
-  Write-Log "Inicio selector GUI." | Out-Null
+  Write-Log "Inicio selector GUI (v12)." | Out-Null
 
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
 
   $repo = Get-RepoRoot
   Write-Log ("Repo root: " + $repo) | Out-Null
+
+  $gitExe = Find-GitExe
+  if ([string]::IsNullOrWhiteSpace($gitExe)) {
+    $p = Write-Log "No encuentro git.exe en PATH ni en rutas tipicas."
+    [System.Windows.Forms.MessageBox]::Show(
+      "No encuentro git.exe.`r`n`r`nSolucion:`r`n- Reinstala Git for Windows y marca 'Add Git to PATH'`r`n- O abre CMD y comprueba: where git`r`n`r`nLog: $p",
+      'LifeCal Selector',
+      [System.Windows.Forms.MessageBoxButtons]::OK,
+      [System.Windows.Forms.MessageBoxIcon]::Error
+    ) | Out-Null
+    exit 4
+  }
+  Write-Log ("Git: " + $gitExe) | Out-Null
 
   $configPath = Join-Path $repo 'lifecal_selector_config.json'
   $cfg = Load-JsonObject $configPath
@@ -311,7 +359,7 @@ try {
   # UI
   $form = New-Object System.Windows.Forms.Form
   $form.Text = 'LifeCal - selector route.tsx (dinamico)'
-  $form.Size = Sz 860 720
+  $form.Size = Sz 920 760
   $form.StartPosition = 'CenterScreen'
   $form.FormBorderStyle = 'FixedDialog'
   $form.MaximizeBox = $false
@@ -319,43 +367,43 @@ try {
   $label = New-Object System.Windows.Forms.Label
   $label.AutoSize = $true
   $label.Location = Pt 16 12
-  $label.Text = "Repo: $repo`r`nBackups: $backupDir`r`nDestino: $target"
+  $label.Text = "Repo: $repo`r`nBackups: $backupDir`r`nDestino: $target`r`nGit: $gitExe"
   $form.Controls.Add($label)
 
   $btnConfig = New-Object System.Windows.Forms.Button
   $btnConfig.Text = 'Config...'
-  $btnConfig.Location = Pt 740 14
+  $btnConfig.Location = Pt 800 14
   $btnConfig.Size = Sz 96 30
   $form.Controls.Add($btnConfig)
 
   $listLabel = New-Object System.Windows.Forms.Label
   $listLabel.AutoSize = $true
-  $listLabel.Location = Pt 16 70
+  $listLabel.Location = Pt 16 88
   $listLabel.Text = 'Versiones (.tsx):'
   $form.Controls.Add($listLabel)
 
   $list = New-Object System.Windows.Forms.ListBox
-  $list.Location = Pt 16 92
-  $list.Size = Sz 820 260
+  $list.Location = Pt 16 110
+  $list.Size = Sz 880 280
   $list.Font = New-Object System.Drawing.Font('Consolas', 10)
   $form.Controls.Add($list)
 
   $descLabel = New-Object System.Windows.Forms.Label
   $descLabel.AutoSize = $true
-  $descLabel.Location = Pt 16 362
+  $descLabel.Location = Pt 16 404
   $descLabel.Text = 'Resumen:'
   $form.Controls.Add($descLabel)
 
   $descBox = New-Object System.Windows.Forms.TextBox
-  $descBox.Location = Pt 16 384
-  $descBox.Size = Sz 820 160
+  $descBox.Location = Pt 16 426
+  $descBox.Size = Sz 880 170
   $descBox.Multiline = $true
   $descBox.ReadOnly = $true
   $descBox.ScrollBars = 'Vertical'
   $descBox.Font = New-Object System.Drawing.Font('Consolas', 9)
   $form.Controls.Add($descBox)
 
-  $btnRowY = 556
+  $btnRowY = 610
 
   $btnRefresh = New-Object System.Windows.Forms.Button
   $btnRefresh.Text = 'Refrescar lista'
@@ -387,7 +435,7 @@ try {
   $btnSnapshot.Size = Sz 176 34
   $form.Controls.Add($btnSnapshot)
 
-  $btnApplyY = 600
+  $btnApplyY = 660
 
   $btnApply = New-Object System.Windows.Forms.Button
   $btnApply.Text = 'Aplicar (copiar a route.tsx)'
@@ -409,13 +457,13 @@ try {
 
   $btnClose = New-Object System.Windows.Forms.Button
   $btnClose.Text = 'Cerrar'
-  $btnClose.Location = Pt 736 $btnApplyY
+  $btnClose.Location = Pt 796 $btnApplyY
   $btnClose.Size = Sz 100 36
   $form.Controls.Add($btnClose)
 
   $status = New-Object System.Windows.Forms.Label
   $status.AutoSize = $true
-  $status.Location = Pt 16 650
+  $status.Location = Pt 16 710
   $status.Text = ''
   $form.Controls.Add($status)
 
@@ -435,9 +483,7 @@ try {
     $status.Text = "Lista refrescada: " + (Get-Date -Format 'HH:mm:ss')
   })
 
-  $chkAuto.Add_CheckedChanged({
-    if ($chkAuto.Checked) { $timer.Start() } else { $timer.Stop() }
-  })
+  $chkAuto.Add_CheckedChanged({ if ($chkAuto.Checked) { $timer.Start() } else { $timer.Stop() } })
 
   $timer.Add_Tick({
     $keep = $null
@@ -509,9 +555,16 @@ try {
 
     if ($chkPush.Checked) {
       try {
-        $resStatus = Run-Git $repo 'status --porcelain'
+        $resStatus = Run-Git $gitExe $repo 'status --porcelain'
         if ($resStatus.ExitCode -ne 0) {
-          [System.Windows.Forms.MessageBox]::Show(("Git status fallo:`r`n{0}" -f $resStatus.Stderr), 'LifeCal Selector') | Out-Null
+          $explain = Explain-GitError $resStatus.Stderr $repo $resStatus.Stdout
+          $p = Write-Log ("git status fallo. GitArgs=" + $resStatus.GitArgs + "`r`nSTDERR:`r`n" + $resStatus.Stderr + "`r`nSTDOUT:`r`n" + $resStatus.Stdout)
+          [System.Windows.Forms.MessageBox]::Show(
+            ("Git status fallo.`r`n`r`nSTDERR:`r`n{0}`r`n`r`nSTDOUT:`r`n{1}`r`n`r`nAyuda:`r`n{2}`r`n`r`nLog: {3}" -f $resStatus.Stderr, $resStatus.Stdout, $explain, $p),
+            'LifeCal Selector',
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+          ) | Out-Null
           return
         }
         if ([string]::IsNullOrWhiteSpace($resStatus.Stdout)) {
@@ -519,15 +572,15 @@ try {
           return
         }
 
-        [void](Run-Git $repo 'add -A')
+        [void](Run-Git $gitExe $repo 'add -A')
         $stamp = Get-Date -Format 'yyyy-MM-dd_HHmm'
         $msg = "Switch route $file $stamp"
-        [void](Run-Git $repo ("commit -m `"$msg`""))
+        [void](Run-Git $gitExe $repo ("commit -m `"$msg`""))
 
-        $resPush = Run-Git $repo 'push'
+        $resPush = Run-Git $gitExe $repo 'push'
         if ($resPush.ExitCode -ne 0) {
-          $p = Write-Log ("git push error: " + $resPush.Stderr)
-          [System.Windows.Forms.MessageBox]::Show(("Git push fallo:`r`n{0}`r`nLog: {1}" -f $resPush.Stderr, $p), 'LifeCal Selector') | Out-Null
+          $p = Write-Log ("git push fallo. GitArgs=" + $resPush.GitArgs + "`r`nSTDERR:`r`n" + $resPush.Stderr + "`r`nSTDOUT:`r`n" + $resPush.Stdout)
+          [System.Windows.Forms.MessageBox]::Show(("Git push fallo:`r`n{0}`r`n`r`nLog: {1}" -f $resPush.Stderr, $p), 'LifeCal Selector') | Out-Null
           return
         }
 
@@ -541,7 +594,7 @@ try {
 
   $btnPull.Add_Click({
     try {
-      $res = Run-Git $repo 'pull'
+      $res = Run-Git $gitExe $repo 'pull'
       $msg = $res.Stdout
       if (-not [string]::IsNullOrWhiteSpace($res.Stderr)) { $msg = $msg + "`r`n`r`n" + $res.Stderr }
       if ([string]::IsNullOrWhiteSpace($msg)) { $msg = '(sin salida)' }
@@ -574,7 +627,7 @@ try {
       $descPath = Join-Path $backupDir 'route_descriptions.json'
       $descMap = Load-JsonObject $descPath
 
-      $label.Text = "Repo: $repo`r`nBackups: $backupDir`r`nDestino: $target"
+      $label.Text = "Repo: $repo`r`nBackups: $backupDir`r`nDestino: $target`r`nGit: $gitExe"
       Refresh-List $list $descBox $null
       $status.Text = 'Config actualizada.'
     } catch {
@@ -583,10 +636,7 @@ try {
     }
   })
 
-  $btnClose.Add_Click({
-    try { $timer.Stop() } catch {}
-    $form.Close()
-  })
+  $btnClose.Add_Click({ try { $timer.Stop() } catch {} ; $form.Close() })
 
   Write-Log "GUI lista. Mostrando ventana." | Out-Null
   [void]$form.ShowDialog()
