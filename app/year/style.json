@@ -1,4 +1,4 @@
-﻿{
+{
     "pastDay":  "#e9e9ea",
     "barTrack":  "#1b1b1d",
     "sundayRed":  "#ff3b30",
@@ -17,7 +17,7 @@
                       "11-08",
                       "11-24"
                   ],
-    "topMarginPct":  0.3,
+    "topMarginPct":  0.21,
     "accent":  "#ff7a00",
     "todayHalo":  "#f2f2f2",
     "bottomMarginPct":  0.22,

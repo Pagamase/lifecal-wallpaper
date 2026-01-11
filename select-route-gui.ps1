@@ -69,7 +69,17 @@ function Load-JsonObject([string]$path) {
 
 function Save-JsonObject([hashtable]$obj, [string]$path) {
   $json = $obj | ConvertTo-Json -Depth 50
-  Set-Content -Path $path -Value $json -Encoding utf8
+
+  # Escribe UTF-8 SIN BOM (PowerShell 5.1 por defecto mete BOM y puede romper el parser de JSON de Next/Vercel)
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($path, $json, $utf8NoBom)
+
+  # Seguridad extra: si por lo que sea quedase algo antes de '{'/'[', lo limpiamos
+  $bytes = [System.IO.File]::ReadAllBytes($path)
+  if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+    $bytes = $bytes[3..($bytes.Length-1)]
+    [System.IO.File]::WriteAllBytes($path, $bytes)
+  }
 }
 
 function Ensure-DirForFile([string]$path) {
