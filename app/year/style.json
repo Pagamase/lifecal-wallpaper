@@ -11,9 +11,13 @@
     "futureDay":  "#2f2f31",
     "bg":  "#0f0f10",
     "birthdays":  [
-
+                      "03-28",
+                      "05-01",
+                      "10-08",
+                      "11-08",
+                      "11-24"
                   ],
-    "topMarginPct":  0.21,
+    "topMarginPct":  0.41,
     "accent":  "#ff7a00",
     "todayHalo":  "#f2f2f2",
     "bottomMarginPct":  0.22,
