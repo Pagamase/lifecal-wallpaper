@@ -1,0 +1,11 @@
+{
+  "01_route_year.tsx": "Calendario anual estilo LifeCal (semana Lunes→Domingo), fondo oscuro y margenes grandes.\nIncluye parametros (width/height/date) y pruebas iniciales con resaltados (cumples y regla del dia 19).",
+  "02_route_year.tsx": "Calendario anual basico (sin cumples ni reglas extra) con semana Lunes→Domingo.\nFindes con color diferenciado (primeras pruebas). Hoy resaltado.",
+  "03_route_year.tsx": "Semana Lunes→Domingo. Sabados en gris y domingos en rojo.\nDias pasados como 'completados'. Hoy resaltado.",
+  "04_route_year.tsx": "Como v03 pero el gris del sabado es mas claro para que destaque mas.\nDomingos rojos. Hoy resaltado.",
+  "05_route_year.tsx": "Como v04 pero ajustando margenes/espaciados para que el texto (% y dias) quede mas pegado al calendario.",
+  "06_route_year.tsx": "Añade barra de progreso anual fina abajo.\nSabado gris claro, domingo rojo. Footer con dias restantes y porcentaje.",
+  "07_route_year.tsx": "Como v06 pero añade cumples fijos con anillo rojo: 05-01, 03-28, 10-08, 11-08, 11-24.\nMantiene barra de progreso.",
+  "08_route_year.tsx": "Version actual (v08): v07 + mejora del 'hoy' para diferenciarlo del domingo rojo.\nHoy tiene halo claro + interior naranja. Barra de progreso y cumples con anillo rojo.",
+  "09_route_year.tsx": "v09: finde 'especial' solo si NO ha pasado.\n- Sabados y domingos pasados se ven como dias completados.\n- El anillo de finde solo aparece en domingo (y solo si no ha pasado).\nMantiene barra de progreso, hoy con halo y cumples con anillo rojo."
+}

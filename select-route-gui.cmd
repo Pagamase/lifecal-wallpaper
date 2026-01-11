@@ -10,18 +10,28 @@ cd /d "%HERE%" || (
   exit /b 1
 )
 
-echo Lanzando LifeCal GUI...
-echo.
+set "CONSOLE_LOG=%HERE%\lifecal_gui_console.log"
+echo Lanzando LifeCal Selector (GUI)... > "%CONSOLE_LOG%"
+echo (Este log captura la consola por si PowerShell peta antes de crear lifecal_gui_error.log) >> "%CONSOLE_LOG%"
+echo. >> "%CONSOLE_LOG%"
 
 REM -STA es importante para Windows Forms
-powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File "%HERE%\select-route-gui.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -File "%HERE%\select-route-gui.ps1" >> "%CONSOLE_LOG%" 2>&1
 
 set "ERR=%errorlevel%"
 if not "%ERR%"=="0" (
+  echo. >> "%CONSOLE_LOG%"
+  echo ============================================================ >> "%CONSOLE_LOG%"
+  echo  La GUI ha fallado. Codigo de salida: %ERR% >> "%CONSOLE_LOG%"
+  echo  - Mira: %HERE%\lifecal_gui_error.log >> "%CONSOLE_LOG%"
+  echo  - Y si no existe, mira: %CONSOLE_LOG% >> "%CONSOLE_LOG%"
+  echo ============================================================ >> "%CONSOLE_LOG%"
+
   echo.
   echo ============================================================
   echo  La GUI ha fallado. Codigo de salida: %ERR%
-  echo  Mira el log: %HERE%\lifecal_gui_error.log
+  echo  - Mira lifecal_gui_error.log (si existe)
+  echo  - Si no existe, abre lifecal_gui_console.log
   echo ============================================================
   echo.
   pause
