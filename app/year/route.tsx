@@ -1,67 +1,13 @@
 import { ImageResponse } from "next/og";
 import type { CSSProperties } from "react";
-import styleJson from "./style.json";
 
 export const runtime = "edge";
 
-type StyleConfig = {
-  bg?: string;
-  label?: string;
-  subtle?: string;
-  accent?: string;
-  pastDay?: string;
-  futureDay?: string;
-  futureSaturday?: string;
-  sundayRed?: string;
-  sundayRedInnerWhenBirthday?: string;
-  birthdayRing?: string;
-  todayHalo?: string;
-  sundayRingColor?: string;
-  barTrack?: string;
-
-  topMarginPct?: number;
-  bottomMarginPct?: number;
-  contentWidthPct?: number;
-  colGapPct?: number;
-  rowGapPct?: number;
-
-  showSundayRing?: boolean;
-  birthdays?: string[];
-};
-
-const DEFAULT_STYLE: Required<StyleConfig> = {
-  bg: "#0f0f10",
-  label: "#a9a9aa",
-  subtle: "#7c7c7d",
-  accent: "#ff7a00",
-  pastDay: "#e9e9ea",
-  futureDay: "#2f2f31",
-  futureSaturday: "#6b6b70",
-  sundayRed: "#ff3b30",
-  sundayRedInnerWhenBirthday: "#b3261e",
-  birthdayRing: "#ff3b30",
-  todayHalo: "#f2f2f2",
-  sundayRingColor: "#f2f2f2",
-  barTrack: "#1b1b1d",
-
-  topMarginPct: 0.3,
-  bottomMarginPct: 0.22,
-  contentWidthPct: 0.72,
-  colGapPct: 0.06,
-  rowGapPct: 0.055,
-
-  showSundayRing: true,
-  birthdays: ["05-01", "03-28", "10-08", "11-08", "11-24"],
-};
-
-const STYLE: Required<StyleConfig> = {
-  ...DEFAULT_STYLE,
-  ...(styleJson as StyleConfig),
-};
-
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+// Semana Lunes->Domingo
 function monFirstIndex(utcDay: number) {
+  // JS: getUTCDay(): 0=Dom ... 6=Sáb  -> queremos 0=Lun ... 6=Dom
   return (utcDay + 6) % 7;
 }
 
@@ -86,31 +32,40 @@ function dayOfYearUTC(d: Date) {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
+  // Defaults: tu tamaño (vertical)
   const width = parseInt(searchParams.get("width") ?? "1179", 10);
   const height = parseInt(searchParams.get("height") ?? "2556", 10);
 
+  // Fecha desde Atajos (YYYY-MM-DD). Si no viene, usamos fecha actual del servidor.
   const dateParam = searchParams.get("date");
   const today = dateParam ? new Date(`${dateParam}T00:00:00Z`) : new Date();
 
   const year = today.getUTCFullYear();
   const todayMidnight = new Date(Date.UTC(year, today.getUTCMonth(), today.getUTCDate()));
 
+  // Progreso anual
   const totalDays = isLeapYear(year) ? 366 : 365;
   const doy = dayOfYearUTC(today);
   const daysLeft = totalDays - doy;
   const progress = Math.min(1, Math.max(0, doy / totalDays));
   const pct = Math.round(progress * 100);
 
-  const BIRTHDAYS = new Set<string>((STYLE.birthdays ?? []).map((s) => String(s).trim()).filter(Boolean));
+  // =========================
+  // Cumples (MM-DD) -> anillo rojo
+  // =========================
+  const BIRTHDAYS = new Set<string>(["05-01", "03-28", "10-08", "11-08", "11-24"]);
 
-  const topMargin = Math.round(height * (STYLE.topMarginPct ?? 0.3));
-  const bottomMargin = Math.round(height * (STYLE.bottomMarginPct ?? 0.22));
+  // =========================
+  // LAYOUT (márgenes grandes)
+  // =========================
+  const topMargin = Math.round(height * 0.30);
+  const bottomMargin = Math.round(height * 0.22);
 
-  const contentW = Math.round(width * (STYLE.contentWidthPct ?? 0.72));
+  const contentW = Math.round(width * 0.72);
   const leftRight = Math.round((width - contentW) / 2);
 
-  const colGap = Math.round(width * (STYLE.colGapPct ?? 0.06));
-  const rowGap = Math.round(width * (STYLE.rowGapPct ?? 0.055));
+  const colGap = Math.round(width * 0.06);
+  const rowGap = Math.round(width * 0.055);
 
   const cols = 3;
   const monthW = Math.floor((contentW - colGap * (cols - 1)) / cols);
@@ -118,8 +73,10 @@ export async function GET(req: Request) {
   const dotGap = Math.max(10, Math.round(monthW * 0.06));
   const dot = Math.max(10, Math.floor((monthW - dotGap * 6) / 7));
 
-  const ringBirthday = Math.max(3, Math.round(dot * 0.22));
-  const todayPad = Math.max(2, Math.round(dot * 0.16));
+  const ringBirthday = Math.max(3, Math.round(dot * 0.22)); // grosor anillo cumple
+  const todayPad = Math.max(2, Math.round(dot * 0.16)); // grosor del anillo claro de HOY
+
+  // Anillo para DOMINGO (solo cuando no ha pasado)
   const ringSunday = Math.max(2, Math.round(dot * 0.14));
 
   const labelFont = Math.max(18, Math.round(dot * 1.25));
@@ -134,23 +91,34 @@ export async function GET(req: Request) {
   const barH = Math.max(6, Math.round(width * 0.008));
   const barGap = Math.max(8, Math.round(barH * 1.2));
 
-  const bg = STYLE.bg;
-  const label = STYLE.label;
-  const subtle = STYLE.subtle;
-  const accent = STYLE.accent;
+  // =========================
+  // COLORES
+  // =========================
+  const bg = "#0f0f10";
+  const label = "#a9a9aa";
+  const subtle = "#7c7c7d";
+  const accent = "#ff7a00"; // HOY
 
-  const pastDay = STYLE.pastDay;
-  const futureDay = STYLE.futureDay;
+  const pastDay = "#e9e9ea";
+  const futureDay = "#2f2f31";
 
-  const futureSaturday = STYLE.futureSaturday;
-  const sundayRed = STYLE.sundayRed;
-  const sundayRedInnerWhenBirthday = STYLE.sundayRedInnerWhenBirthday;
+  // Sabado futuro (cuando aun no ha pasado)
+  const futureSaturday = "#6b6b70";
 
-  const birthdayRing = STYLE.birthdayRing;
-  const todayHalo = STYLE.todayHalo;
-  const sundayRingColor = STYLE.sundayRingColor;
+  // Domingo futuro (cuando aun no ha pasado)
+  const sundayRed = "#ff3b30";
+  // Si es domingo y cumple, oscurecemos el interior para que el anillo rojo se vea
+  const sundayRedInnerWhenBirthday = "#b3261e";
 
-  const barTrack = STYLE.barTrack;
+  const birthdayRing = "#ff3b30"; // anillo cumples
+
+  // Halo claro para HOY (para diferenciar de domingo rojo)
+  const todayHalo = "#f2f2f2";
+
+  // Anillo DOMINGO (solo domingo)
+  const sundayRingColor = todayHalo;
+
+  const barTrack = "#1b1b1d";
 
   return new ImageResponse(
     (
@@ -176,6 +144,7 @@ export async function GET(req: Request) {
             boxSizing: "border-box",
           }}
         >
+          {/* Months grid */}
           <div
             style={
               {
@@ -253,7 +222,8 @@ export async function GET(req: Request) {
                         );
                       }
 
-                      const weekdayIndex = (startOffset + (dayNum - 1)) % 7; // 0=Lun..6=Dom
+                      // 0=Lun..6=Dom
+                      const weekdayIndex = (startOffset + (dayNum - 1)) % 7;
                       const isSaturday = weekdayIndex === 5;
                       const isSunday = weekdayIndex === 6;
 
@@ -264,8 +234,12 @@ export async function GET(req: Request) {
                       const mmdd = `${pad2(month0 + 1)}-${pad2(dayNum)}`;
                       const isBirthday = BIRTHDAYS.has(mmdd);
 
+                      // =========================
+                      // v09: si el finde ya paso -> se ve como "completado"
+                      // =========================
                       let fillBase: string;
                       if (isPast) {
+                        // Da igual si es sábado/domingo: ya es día completado
                         fillBase = pastDay;
                       } else if (isSunday) {
                         fillBase = isBirthday ? sundayRedInnerWhenBirthday : sundayRed;
@@ -275,6 +249,7 @@ export async function GET(req: Request) {
                         fillBase = futureDay;
                       }
 
+                      // --- HOY: naranja con anillo claro (para que destaque sobre domingo rojo) ---
                       if (isToday) {
                         const outerStyle: CSSProperties = {
                           display: "flex",
@@ -288,9 +263,11 @@ export async function GET(req: Request) {
                           justifyContent: "center",
                         };
 
+                        // Prioridad: si cumple, anillo rojo
                         if (isBirthday) {
                           outerStyle.border = `${ringBirthday}px solid ${birthdayRing}`;
-                        } else if (STYLE.showSundayRing && isSunday) {
+                        } else if (isSunday) {
+                          // v09: anillo de domingo (solo domingo). En HOY lo aplicamos solo si NO es cumple.
                           outerStyle.border = `${ringSunday}px solid ${sundayRingColor}`;
                         }
 
@@ -309,6 +286,7 @@ export async function GET(req: Request) {
                         );
                       }
 
+                      // --- NO hoy: bolita normal (+ anillo rojo si cumple) ---
                       let dotStyle: CSSProperties = {
                         display: "flex",
                         width: dot,
@@ -320,7 +298,8 @@ export async function GET(req: Request) {
 
                       if (isBirthday) {
                         dotStyle = { ...dotStyle, border: `${ringBirthday}px solid ${birthdayRing}` };
-                      } else if (STYLE.showSundayRing && !isPast && isSunday) {
+                      } else if (!isPast && isSunday) {
+                        // v09: anillo solo en domingo (y solo si no ha pasado)
                         dotStyle = { ...dotStyle, border: `${ringSunday}px solid ${sundayRingColor}` };
                       }
 
@@ -334,6 +313,7 @@ export async function GET(req: Request) {
 
           <div style={{ display: "flex", height: footerGap }} />
 
+          {/* Footer: days left + % */}
           <div
             style={{
               display: "flex",
@@ -352,6 +332,7 @@ export async function GET(req: Request) {
 
           <div style={{ display: "flex", height: barGap }} />
 
+          {/* Barra */}
           <div
             style={{
               display: "flex",
