@@ -244,27 +244,29 @@ function Show-StyleEditor([string]$stylePath, [string]$gitExe, [string]$repo) {
     $lbl.AutoSize = $true
     $lbl.Location = Pt 8 $script:y
     $lbl.Text = $label
-    $panel.Controls.Add($lbl)
+    [void]$panel.Controls.Add($lbl)
 
     $tb = New-Object System.Windows.Forms.TextBox
     $tb.Location = Pt 320 $script:y
     $tb.Size = Sz 170 22
     $tb.Text = $value
-    $panel.Controls.Add($tb)
+    [void]$panel.Controls.Add($tb)
 
     $btn = New-Object System.Windows.Forms.Button
     $btn.Text = '...'
     $btn.Location = Pt 500 $script:y
     $btn.Size = Sz 36 22
-    $panel.Controls.Add($btn)
+    [void]$panel.Controls.Add($btn)
 
-    $btn.Add_Click({
+    # IMPORTANT: capturar referencia local (evita líos de scope) + evitar outputs al pipeline
+    $tbLocal = $tb
+    $null = $btn.Add_Click({
       $cd = New-Object System.Windows.Forms.ColorDialog
       $cd.FullOpen = $true
-      $norm = Normalize-Hex $tb.Text
+      $norm = Normalize-Hex $tbLocal.Text
       if ($norm) { try { $cd.Color = [System.Drawing.ColorTranslator]::FromHtml($norm) } catch {} }
       if ($cd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        $tb.Text = ("#{0:X2}{1:X2}{2:X2}" -f $cd.Color.R, $cd.Color.G, $cd.Color.B).ToLower()
+        $tbLocal.Text = ("#{0:X2}{1:X2}{2:X2}" -f $cd.Color.R, $cd.Color.G, $cd.Color.B).ToLower()
       }
     })
 
@@ -300,7 +302,7 @@ function Show-StyleEditor([string]$stylePath, [string]$gitExe, [string]$repo) {
     $lbl.AutoSize = $true
     $lbl.Location = Pt 8 $script:y
     $lbl.Text = $label
-    $panel.Controls.Add($lbl)
+    [void]$panel.Controls.Add($lbl)
 
     $num = New-Object System.Windows.Forms.NumericUpDown
     $num.Location = Pt 320 $script:y
@@ -310,7 +312,7 @@ function Show-StyleEditor([string]$stylePath, [string]$gitExe, [string]$repo) {
     $num.Minimum = 0.05
     $num.Maximum = 0.95
     $num.Value = [decimal]$value
-    $panel.Controls.Add($num)
+    [void]$panel.Controls.Add($num)
 
     $script:y += 30
     return $num

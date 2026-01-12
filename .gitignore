@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Local-only / generated stuff
+lifecal_route_backups/
+patch/
+scripts/
+.vercel/
+tools_local/
+# Artifacts
+*.zip
